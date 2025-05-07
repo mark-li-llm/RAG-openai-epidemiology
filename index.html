@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CDC RAG Demo System</title>
+
+  <!-- Tailwind (CDN) -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+
+  <style>
+    .loader{border:3px solid #f3f3f3;border-radius:50%;border-top:3px solid #3498db;width:24px;height:24px;animation:spin 1s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
+    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+    .fade-in{animation:fadeIn 0.5s}
+    @keyframes fadeIn{0%{opacity:0}100%{opacity:1}}
+    .source-item{transition:background-color 0.2s}
+  </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+  <div class="container mx-auto px-4 py-8">
+
+    <!-- ────── Header ────── -->
+    <header class="mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-3xl font-bold text-gray-800">CDC Weekly Reports RAG System</h1>
+        <div class="flex items-center">
+          <img src="https://via.placeholder.com/40" alt="AI Icon" class="h-10 w-10 mr-2">
+          <span class="text-xl font-semibold text-blue-600">Powered by OpenAI</span>
+        </div>
+      </div>
+      <p class="text-gray-600 text-lg">
+        Retrieval‑Augmented Generation demo using CDC Weekly Reports as knowledge base
+      </p>
+    </header>
+
+    <!-- ────── Main Card ────── -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+      <!-- Controls -->
+      <div class="flex flex-col md:flex-row md:items-end gap-4 mb-6">
+        <div class="flex-grow">
+          <label for="question-select" class="block text-sm font-medium text-gray-700 mb-1">
+            Select a question:
+          </label>
+          <select id="question-select"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+            <option value="">-- Select a question --</option>
+          </select>
+        </div>
+
+        <div class="w-full md:w-48">
+          <label for="style-select" class="block text-sm font-medium text-gray-700 mb-1">
+            Answer style:
+          </label>
+          <select id="style-select"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+            <option value="concise">Concise</option>
+            <option value="detailed">Detailed</option>
+          </select>
+        </div>
+
+        <button id="ask-button"
+                class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none
+                       focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-300"
+                disabled>
+          Ask Question
+        </button>
+      </div>
+
+      <!-- Selected question -->
+      <div id="selected-question-display"
+           class="border-l-4 border-blue-500 pl-4 py-2 mb-6 hidden">
+        <div class="text-sm text-gray-600 mb-1">Selected Question:</div>
+        <div id="selected-question-text" class="text-lg font-medium"></div>
+      </div>
+
+      <!-- Loading spinner -->
+      <div id="loading" class="hidden">
+        <div class="flex items-center text-blue-600">
+          <div class="loader"></div>
+          <span>Retrieving answer…</span>
+        </div>
+      </div>
+
+      <!-- Answer + sources -->
+      <div id="answer-container" class="hidden">
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-2 text-gray-700">Answer:</h3>
+          <div id="answer" class="bg-gray-50 p-4 rounded-md border border-gray-200"></div>
+        </div>
+
+        <div>
+          <h3 class="text-lg font-semibold mb-2 text-gray-700">Sources:</h3>
+          <div id="sources-list" class="space-y-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- About section -->
+    <div class="bg-white rounded-lg shadow-lg p-6">
+      <h2 class="text-xl font-bold mb-4 text-gray-800">About This Demo</h2>
+      <p class="mb-4">This application demonstrates a Retrieval‑Augmented Generation (RAG) system built with:</p>
+      <ul class="list-disc pl-5 space-y-2 mb-4">
+        <li>OpenAI API for language‑model capabilities</li>
+        <li>CDC Weekly Reports as the knowledge base</li>
+        <li>Vector database for efficient retrieval</li>
+        <li>Prompt engineering for contextual responses</li>
+      </ul>
+      <p>The page uses <strong>pre‑computed JSON</strong> to avoid live API costs, but the UI behaves exactly like a real‑time system.</p>
+    </div>
+  </div>
+
+  <footer class="mt-8 py-4 border-t border-gray-200">
+    <div class="container mx-auto px-4 text-center text-gray-600">
+      © 2025 CDC RAG System Demo
+    </div>
+  </footer>
+
+  <!-- ────── Script Section ────── -->
+  <script>
+    /* 1) flat historyData —— 示范仅两条，实际请替换/加载你自己的 */
+    const historyData = [
+        {
+        "timestamp": "2025-05-06 19:20:30",
+        "question": "what is Dengue",
+        "answer": "Dengue is a mosquitoborne viral illness that can cause acute febrile illness, severe disease, or death, transmitted primarily by Aedes mosquitoes. It is caused by four different DENV serotypes, and infection with one provides long-lasting immunity against that serotype but only transient protection against the others.",
+        "style": "concise",
+        "sources": [
+        "• **0002_Epidemiology_of_Dengue_â_Puerto_Rico_2010â_2024.txt** (chunk #0)",
+        "• **0002_Epidemiology_of_Dengue_â_Puerto_Rico_2010â_2024.txt** (chunk #1)",
+        "• **0002_Epidemiology_of_Dengue_â_Puerto_Rico_2010â_2024.txt** (chunk #5)"
+        ]
+    },
+    {
+        "timestamp": "2025-05-06 19:21:40",
+        "question": "what is Dengue",
+        "answer": "**What is Dengue?**\n\nDengue is a viral illness transmitted primarily by mosquitoes, notably *Aedes aegypti* and *Aedes albopictus*. It is a significant public health concern worldwide due to its increasing incidence and potential severity. The disease can manifest in various forms, ranging from mild to life-threatening.\n\n**1. Nature of the Disease**\n- **Viral Etiology:** Dengue is caused by the dengue virus (DENV), which has four distinct serotypes (DENV-1, DENV-2, DENV-3, and DENV-4) [^1].\n- **Transmission:** The virus is transmitted to humans through the bites of infected female mosquitoes, mainly *Aedes aegypti* and *Aedes albopictus* [^1].\n\n**2. Clinical Manifestations**\n- **Asymptomatic Infection:** Some individuals infected with DENV may not show symptoms.\n- **Acute Febrile Illness:** Characterized by sudden onset of high fever, headache, muscle and joint pains, rash, and mild bleeding.\n- **Severe Dengue:** In some cases, the disease progresses to severe forms involving severe bleeding, plasma leakage, or organ failure, which can be fatal if not properly managed [^2].\n\n**3. Immunity and Serotypes**\n- Infection with one DENV serotype provides long-lasting immunity against that specific serotype but only transient protection against the others [^3].\n- The presence of multiple serotypes in an area can lead to increased risk of severe disease upon secondary infection.\n\n**4. Prevention Strategies**\n- **Mosquito Control:** Eliminating water-holding containers, using insect repellents, and wearing protective clothing.\n- **Personal Protective Measures:** Avoiding mosquito bites, especially during peak mosquito activity times.\n- **Vaccination:** The Dengvaxia vaccine is recommended for certain age groups with prior DENV infection in endemic areas but is being discontinued due to lack of demand [^1].\n\n**5. Epidemiology**\n- Dengue is endemic in many regions, including Puerto Rico, where outbreaks occur every 3–7 years.\n- The disease burden is increasing globally, with recent outbreaks showing shifts in age distribution and serotype predominance [^1].\n\n**Summary**\nDengue is a mosquito-borne viral disease with a spectrum of clinical presentations, from mild febrile illness to severe, life-threatening conditions. Its control relies on mosquito prevention measures, vaccination where appropriate, and early clinical management to reduce mortality.\n\n---\n\n**References:**\n[^1]: Abstract and introduction sections.\n[^2]: Introduction section.\n[^3]: Introduction section.",
+        "style": "detailed",
+        "sources": [
+        "• **0002_Epidemiology_of_Dengue_â_Puerto_Rico_2010â_2024.txt** (chunk #0)",
+        "• **0002_Epidemiology_of_Dengue_â_Puerto_Rico_2010â_2024.txt** (chunk #1)",
+        "• **0002_Epidemiology_of_Dengue_â_Puerto_Rico_2010â_2024.txt** (chunk #5)"
+        ]
+    },
+      /* …更多记录… */
+    ];
+    
+    /* 2) 缓存 DOM */
+    const qSelect  = document.getElementById('question-select');
+    const sSelect  = document.getElementById('style-select');
+    const askBtn   = document.getElementById('ask-button');
+    const qDisplay = document.getElementById('selected-question-display');
+    const qText    = document.getElementById('selected-question-text');
+    const loading  = document.getElementById('loading');
+    const ansBox   = document.getElementById('answer-container');
+    const ansElm   = document.getElementById('answer');
+    const srcList  = document.getElementById('sources-list');
+    
+    /* 3) 初始化 —— 填充去重后的问题列表 */
+    function init() {
+      const seen = new Set();
+      historyData.forEach(rec => {
+        if (seen.has(rec.question)) return;
+        seen.add(rec.question);
+        const opt = document.createElement('option');
+        opt.value = rec.question;
+        opt.textContent = rec.question.length > 100
+            ? rec.question.slice(0, 97) + '…'
+            : rec.question;
+        qSelect.appendChild(opt);
+      });
+    
+      qSelect.onchange = handleQuestion;
+    
+      /* style 切换后需要重新 Ask，因此只隐藏答案 & 重新点亮按钮 */
+      sSelect.onchange = () => {
+        ansBox.classList.add('hidden');
+        askBtn.disabled = !qSelect.value;
+      };
+    
+      askBtn.onclick = askQuestion;
+    }
+    
+    /* 4) 选了问题后，展示标题并允许 Ask */
+    function handleQuestion() {
+      if (qSelect.value) {
+        qDisplay.classList.remove('hidden');
+        qText.textContent = qSelect.value;
+        askBtn.disabled = false;
+        ansBox.classList.add('hidden');
+      } else {
+        qDisplay.classList.add('hidden');
+        askBtn.disabled = true;
+      }
+    }
+    
+    /* 5) Ask：模拟网络延迟后渲染答案 */
+    function askQuestion() {
+      loading.classList.remove('hidden');
+      ansBox.classList.add('hidden');
+      setTimeout(() => {
+        loading.classList.add('hidden');
+        showAnswer();
+      }, 600);
+    }
+    
+    /* 6) 根据 (question, style) 精确检索并展示 */
+    function showAnswer() {
+      const rec = historyData.find(r =>
+        r.question === qSelect.value && r.style === sSelect.value
+      );
+    
+      if (!rec) {
+        ansElm.innerHTML = '<p class="italic text-gray-500">No matching entry.</p>';
+        srcList.innerHTML = '';
+        ansBox.classList.remove('hidden');
+        return;
+      }
+    
+      ansElm.innerHTML = rec.answer
+        .split('\n\n')
+        .map(p => `<p class="mb-3">${p}</p>`)
+        .join('');
+    
+      srcList.innerHTML = '';
+      (rec.sources || []).forEach(src => {
+        const div = document.createElement('div');
+        div.className =
+          'source-item bg-gray-50 p-3 rounded-md border border-gray-200 hover:bg-gray-100';
+        div.innerHTML = `<p class="text-sm font-medium">${src}</p>`;
+        srcList.appendChild(div);
+      });
+    
+      ansBox.classList.remove('hidden');
+    }
+    
+    /* 7) DOM Ready */
+    document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
